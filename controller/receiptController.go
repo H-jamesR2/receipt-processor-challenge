@@ -65,10 +65,11 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 
-	receipt.ID = model.GenerateUniqueID()
-	model.CalculatePoints(&receipt)
+	receipt.GenerateUniqueID()
+	receipt.CalculatePoints()
 
 	model.AddReceipt(receipt)
+	
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
@@ -126,25 +127,28 @@ func parseAndFormatDate(dateStr string) (string, error) {
 	}
 	// Define possible date formats
 	formats := []string{
-		"2006-01-02", // YYYY-MM-DD
-		"02-01-2006", // DD-MM-YYYY
-		"01/02/2006", // MM/DD/YYYY
-		"2006/01/02", // YYYY/MM/DD
+		"01/02/2006",   // MM/DD/YYYY
+		"02/01/2006",   // DD/MM/YYYY
+		"2006-01-02",   // YYYY-MM-DD
+		"2006/01/02",   // YYYY/MM/DD
+		"Jan 2, 2006",  // Jan 2, 2006
+		"02-Jan-2006",  // 02-Jan-2006
 	}
 	var parsedDate time.Time
 	var err error
+	var dateLayout = "2006-01-02"
+
 	// Try parsing with each format
 	for _, format := range formats {
 		if parsedDate, err = time.Parse(format, dateStr); err == nil {
-			break
+			
+
+			// Successfully parsed the date
+			return parsedDate.Format(dateLayout), nil
 		}
 	}
-	// parsed dateStr not a valid dateString.
-	if err != nil {
-		return "", fmt.Errorf("error parsing date %s: %v", dateStr, err)
-	}
-	// Format date to YYYY-MM-DD
-	return parsedDate.Format("2006-01-02"), nil
+
+	return "", fmt.Errorf("error parsing date %s: %v", dateStr, err)
 }
 // Time Functions
 func is24HourFormat(timeStr string) bool {
@@ -179,6 +183,7 @@ func parseAndFormatTime(timeStr string) (string, error) {
 	// Format time to 24-hour clock format
 	return parsedTime.Format("15:04"), nil
 }
+
 // Clean item descriptions by trimming and reducing multiple spaces
 func cleanItemShortDescriptions(receipt *model.Receipt) {
 	for i, item := range receipt.Items {
