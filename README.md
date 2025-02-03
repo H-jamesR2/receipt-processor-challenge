@@ -7,6 +7,12 @@ Provide any instructions required to run your application.
 
 Data does not need to persist when your application stops. It is sufficient to store information in memory. There are too many different database solutions, we will not be installing a database on our system when testing your application.
 
+## Table of Contents:
+1. [Description](#description)
+2. [API-Specs-Summary](#Summary-of-API-Specification)
+3. [Running-the-Server](#Running-the-Server)
+4. [Testing-the-API](#Testing-the-API)
+
 ## Language Selection
 
 You can assume our engineers have Go and Docker installed to run your application. Go is our preferred language, but it is not a requirement for this exercise. If you are not using Go, include a Dockerized setup to run the code. You should also provide detailed instructions if your Docker file requires any additional configuration to run the application.
@@ -152,7 +158,7 @@ Breakdown:
 
 ---
 
-# FAQ
+<!-- # FAQ
 
 ### How will this exercise be evaluated?
 An engineer will review the code you submit. At a minimum they must be able to run the service and the service must provide the expected results. You
@@ -171,4 +177,90 @@ the reviewing engineer.
 
 ### How long do I have to complete the exercise?
 There is no time limit for the exercise. Out of respect for your time, we designed this exercise with the intent that it should take you a few hours. But, please
-take as much time as you need to complete the work.
+take as much time as you need to complete the work. -->
+
+---
+### Running-the-Server
+#### Setup:
+1. Either, Just run the **dockerFile**
+2. OR install dependencies manually (Go + UUID Library).
+
+##### Run the Docker file
+1. Assuming you have docker installed, and that the docker daemon is running
+  - build the docker image:
+  - `docker build -f dockerFiles/test.Dockerfile  -t receipt_api .`
+2. Run the docker container:
+- `docker run -p 8080:8080 receipt_api`
+3. GoTo [Testing-the-API](#Testing-the-API) for sample curl examples.
+
+##### Manual-Installation-of-Dependencies:
+1. Ensure that you have goLang installed (version used: go 1.22.4)
+2. Initalize go modules `go mod init`.
+3. Then run `go mod tidy`.
+4. Ensure that you have google's uuid library. [not sure if you have to install this directly OR those 2 previous commands are enough?]
+  - To install google's UUID library use:
+  - `go get github.com/google/uuid` OR
+  - `go install github.com/google/uuid@latest`
+  - (if not) install github.com/google/uuid by running `go mod tidy`.
+5. Run the server using `go run main.go` from the project root directory.
+6. GoTo [Testing-the-API](#Testing-the-API) for sample curl examples.
+
+### Testing-the-API
+#### Optional (if you have jq [library]):
+add " | jq" at end of each curl statement below to get cleaner json format...
+#### Create a new receipt (`POST`):
+```sh
+curl -X POST http://localhost:8080/receipts/process -H "Content-Type: application/json" -d '{
+  "retailer": "Target",
+  "purchaseDate": "2022-01-01",
+  "purchaseTime": "13:01",
+  "items": [
+    {
+      "shortDescription": "Mountain Dew 12PK",
+      "price": "6.49"
+    },{
+      "shortDescription": "Emils Cheese Pizza",
+      "price": "12.25"
+    },{
+      "shortDescription": "Knorr Creamy Chicken",
+      "price": "1.26"
+    },{
+      "shortDescription": "Doritos Nacho Cheese",
+      "price": "3.35"
+    },{
+      "shortDescription": "   Klarbrunn 12-PK 12 FL OZ  ",
+      "price": "12.00"
+    }
+  ],
+  "total": "35.35"
+}'
+```
+
+#### Creating a new receipt (`POST`) from stored `JSON` file:
+```sh
+curl -X POST http://localhost:8080/receipts/process -H "Content-Type: application/json" -d @[Directory of JSON Files]/[JSON File]
+```
+##### Example:
+```sh
+curl -X POST http://localhost:8080/receipts/process -H "Content-Type: application/json" -d @examples/readme-mmCornerMarket-receipt.json
+```
+
+#### Retrieve (`GET`) the list of all receipts:
+```sh
+curl http://localhost:8080/receipts/
+```
+
+#### Retrieve (`GET`) a specific receipt by ID (replace `RECEIPT_ID` with the actual ID returned in the response):
+```sh
+curl http://localhost:8080/receipts/RECEIPT_ID
+```
+
+#### Retrieve (`GET`) the points for a specific receipt by ID (replace `RECEIPT_ID` with the actual ID returned in the response):
+```sh
+curl http://localhost:8080/receipts/RECEIPT_ID/points
+```
+
+#### Running a command to a non-existent endpoint should return an Endpoint not found.
+```sh
+curl http://localhost:8080/rcpt
+```
