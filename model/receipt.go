@@ -9,6 +9,10 @@ import (
 	"time"
 	"unicode"
 	"github.com/google/uuid"
+	"receipt-processor-challenge/config"
+
+	"strings"
+	"regexp"
 )
 type Item struct {
 	ShortDescription string `json:"shortDescription"`
@@ -27,11 +31,11 @@ var (
 	receipts    = make(map[string]Receipt)
 	receiptsMux sync.Mutex
 )
-func GenerateUniqueID() string {
-	return uuid.New().String()
+func (r *Receipt) GenerateUniqueID() {
+	r.ID = uuid.New().String()
 }
 
-func ValidateReceipt(receipt Receipt) error {
+func (receipt *Receipt) ValidateReceipt() error {
 	standardErrorPrefix := "error processing receipt:\n   "
 	if receipt.Retailer == "" {
 		return errors.New(standardErrorPrefix + "retailer cannot be empty")
@@ -62,7 +66,12 @@ func ValidateReceipt(receipt Receipt) error {
 		}
 	}
 
+	// run check on items before cleaning...
+
+	// convert to float + round...
 	receiptTotal, receiptErr := strconv.ParseFloat(receipt.Total, 64)
+	receiptTotal, testItemsTotal = config.RoundToNearestCent(receiptTotal), config.RoundToNearestCent(testItemsTotal)
+	
 	if receiptErr != nil {
 		return errors.New(standardErrorPrefix + "error on total price")
 	} else if receiptTotal != testItemsTotal {
@@ -81,7 +90,7 @@ func ValidateReceipt(receipt Receipt) error {
 }
 
 
-func CalculatePoints(receipt *Receipt) {
+func (receipt *Receipt) CalculatePoints() {
 	// Points Calculation
 	points := uint(0)
 
@@ -112,10 +121,12 @@ func CalculatePoints(receipt *Receipt) {
 	receipt.Points = points
 }
 
-func AddReceipt(receipt Receipt) {
+func AddReceipt(receipt Receipt) error {
 	receiptsMux.Lock()
 	receipts[receipt.ID] = receipt
 	receiptsMux.Unlock()
+
+	return nil
 }
 func GetReceiptById(id string) (Receipt, bool) {
 	receiptsMux.Lock()
@@ -146,7 +157,7 @@ func validateDate(dateStr string) error {
 			return errors.New("error: date format must be YYYY-MM-DD")
 		} */
 	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
-		return errors.New("error processing receipt,\n   invalid purchase date: date " + dateStr + " is invalid")
+		return errors.New("error processing receipt, invalid purchase date: date " + dateStr + " is invalid")
 	}
 	return nil
 }
@@ -157,7 +168,7 @@ func validateTime(timeStr string) error {
 			return errors.New("error: time format must be HH:MM")
 		} */
 	if _, err := time.Parse("15:04", timeStr); err != nil {
-		return errors.New("error processing receipt,\n   invalid purchase time: time " + timeStr + " is invalid")
+		return errors.New("error processing receipt, invalid purchase time: time " + timeStr + " is invalid")
 	}
 	return nil
 }
@@ -174,8 +185,10 @@ func isTimeInRange(timeStr string) (bool, error) {
 	// Define the start and end times of the range
 	startTime, _ := time.Parse(layout, "14:00")
 	endTime, _ := time.Parse(layout, "16:00")
+	
 	// return True if time -> after Start AND before End
-	return t.After(startTime) && t.Before(endTime), nil
+	inRange := t.After(startTime) && t.Before(endTime)
+	return inRange, nil
 }
 
 
@@ -254,4 +267,17 @@ func calculatePointsFromPurchaseTime(purchaseTime string) uint {
 		fmt.Println(err)
 	}
 	return points
+}
+
+func (r *Receipt) CleanItemShortDescriptions() {
+    for i, item := range r.Items {
+        // Trim leading and trailing spaces
+        description := strings.TrimSpace(item.ShortDescription)
+
+        // Replace multiple spaces with a single space
+        re := regexp.MustCompile(`\s+`)
+        description = re.ReplaceAllString(description, " ")
+
+        r.Items[i].ShortDescription = description
+    }
 }
