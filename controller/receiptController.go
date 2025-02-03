@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 )
+
 // GET MethodS
 func GetReceipt(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/receipts/"), "/")
@@ -35,15 +36,20 @@ func GetReceipt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(receipt)
 }
+
 // POST Method
 func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 	var receipt model.Receipt
 	receipt.Items = []model.Item{} // Initialize Items to an empty slice
-	err := json.NewDecoder(r.Body).Decode(&receipt)
+
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields() // Reject unknown 
+	err := decoder.Decode(&receipt)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
 	// run trimming operation for itemShortDescriptions...
 	cleanItemShortDescriptions(&receipt)
 	// reformat Date if needed.
@@ -58,17 +64,19 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println(err)
 	}
+
 	receipt.ID = model.GenerateUniqueID()
-	receipt.Points = model.CalculatePoints(receipt)
+	model.CalculatePoints(&receipt)
+
 	model.AddReceipt(receipt)
 	w.Header().Set("Content-Type", "application/json")
-	response := struct {
+	json.NewEncoder(w).Encode(struct {
 		ID string `json:"id"`
 	}{
 		ID: receipt.ID,
-	}
-	json.NewEncoder(w).Encode(response)
+	})
 }
+
 // Updated handler to get points for a specific receipt
 func GetReceiptPoints(w http.ResponseWriter, r *http.Request, id string) {
 	receipt, exists := model.GetReceiptById(id)
@@ -77,14 +85,14 @@ func GetReceiptPoints(w http.ResponseWriter, r *http.Request, id string) {
 		return
 	}
 
-	points := receipt.Points
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
 		Points uint `json:"points"`
 	}{
-		Points: points,
+		Points: receipt.Points,
 	})
 }
+
 // NotFoundHandler handles requests to non-existent endpoints
 func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
     // Set the status code to 404
