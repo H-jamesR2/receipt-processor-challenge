@@ -69,6 +69,7 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 	model.CalculatePoints(&receipt)
 
 	model.AddReceipt(receipt)
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(struct {
 		ID string `json:"id"`
