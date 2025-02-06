@@ -41,6 +41,15 @@ func (receipt *Receipt) ValidateReceipt() error {
 		return errors.New(standardErrorPrefix + "retailer cannot be empty")
 	}
 
+	// Validate purchase date
+	if err := validateDate(receipt.PurchaseDate); err != nil {
+		return err
+	}
+	// Validate purchase time
+	if err := validateTime(receipt.PurchaseTime); err != nil {
+		return err
+	}
+
 	if len(receipt.Items) == 0 {
 		return errors.New(standardErrorPrefix + "items cannot be empty")
 	}
@@ -78,14 +87,6 @@ func (receipt *Receipt) ValidateReceipt() error {
 		return errors.New(standardErrorPrefix + "item calculatedTotal does not match Total price")
 	}
 
-	// Validate purchase date
-	if err := validateDate(receipt.PurchaseDate); err != nil {
-		return err
-	}
-	// Validate purchase time
-	if err := validateTime(receipt.PurchaseTime); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -218,16 +219,63 @@ func validateDate(dateStr string) error {
 
     return nil
 }
+
 func validateTime(timeStr string) error {
-	// No need to match if Valid, just convert
-	/*
-		if matched, _ := regexp.MatchString(`^\d{2}:\d{2}$`, timeStr); !matched {
-			return errors.New("error: time format must be HH:MM")
-		} */
-	if _, err := time.Parse("15:04", timeStr); err != nil {
-		return errors.New("error processing receipt, invalid purchase time: time " + timeStr + " is invalid")
-	}
-	return nil
+    if timeStr == "" {
+        return errors.New("time cannot be empty")
+    }
+
+    // Handle different time formats
+    var hours, minutes int
+    var err error
+
+    // Check if time contains AM/PM
+    isAMPM := strings.Contains(strings.ToUpper(timeStr), "AM") || strings.Contains(strings.ToUpper(timeStr), "PM")
+
+    if isAMPM {
+        // Parse 12-hour format
+        timeStr = strings.ToUpper(timeStr)
+        timeStr = strings.TrimSpace(timeStr)
+        
+        // Remove any seconds if present
+        if strings.Count(timeStr, ":") == 2 {
+            parts := strings.Split(timeStr, ":")
+            timeStr = parts[0] + ":" + parts[1] + strings.Split(parts[2], " ")[1]
+        }
+
+        t, err := time.Parse("3:04 PM", timeStr)
+        if err != nil {
+            return fmt.Errorf("invalid 12-hour time format: %s", timeStr)
+        }
+        hours = t.Hour()
+        minutes = t.Minute()
+    } else {
+        // Parse 24-hour format
+        parts := strings.Split(timeStr, ":")
+        if len(parts) < 2 {
+            return errors.New("time must be in HH:MM format")
+        }
+
+        hours, err = strconv.Atoi(parts[0])
+        if err != nil {
+            return fmt.Errorf("invalid hours format: %s", parts[0])
+        }
+
+        minutes, err = strconv.Atoi(parts[1])
+        if err != nil {
+            return fmt.Errorf("invalid minutes format: %s", parts[1])
+        }
+    }
+
+    // Validate hours and minutes
+    if hours < 0 || hours > 23 {
+        return fmt.Errorf("invalid hours: %d (must be between 0 and 23)", hours)
+    }
+    if minutes < 0 || minutes > 59 {
+        return fmt.Errorf("invalid minutes: %d (must be between 0 and 59)", minutes)
+    }
+
+    return nil
 }
 
 // Time Check

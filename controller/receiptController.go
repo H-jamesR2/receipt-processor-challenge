@@ -51,14 +51,14 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// run trimming operation for itemShortDescriptions...
-	cleanItemShortDescriptions(&receipt)
-
-	    // Validate receipt before any processing
+	// Validate receipt before any processing
     if err := receipt.ValidateReceipt(); err != nil {
         http.Error(w, err.Error(), http.StatusBadRequest)
         return
     }
+
+	// run trimming operation for itemShortDescriptions...
+	cleanItemShortDescriptions(&receipt)
 
     // Format date only if validation passed
     formattedDate, err := parseAndFormatDate(receipt.PurchaseDate)
@@ -68,12 +68,13 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
     }
     receipt.PurchaseDate = formattedDate
 	
-	// reformat Time if needed.
-	if formattedTime, err := parseAndFormatTime(receipt.PurchaseTime); err == nil {
-		receipt.PurchaseTime = formattedTime
-	} else {
-		fmt.Println(err)
-	}
+    // Format time only if validation passed
+    formattedTime, err := parseAndFormatTime(receipt.PurchaseTime)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Time formatting error: %v", err), http.StatusBadRequest)
+        return
+    }
+    receipt.PurchaseTime = formattedTime
 
 	receipt.GenerateUniqueID()
 	receipt.CalculatePoints()
@@ -183,35 +184,62 @@ func parseAndFormatDate(dateStr string) (string, error) {
 // Time Functions
 func is24HourFormat(timeStr string) bool {
 	// Regular expression to check if the time string is in HH:MM format
-	re := regexp.MustCompile(`^([01][0-9]|2[0-3]):[0-5][0-9]$`)
+	re := regexp.MustCompile(`^([01][0-9]|2[0-3]):([0-5][0-9])$`)
 	return re.MatchString(timeStr)
 }
+
 func parseAndFormatTime(timeStr string) (string, error) {
-	// If the time string is already in 24-hour format, return it directly
-	if is24HourFormat(timeStr) {
-		return timeStr, nil
-	}
-	// Define possible time formats
-	formats := []string{
-		"15:04",       // 24-hour clock with minutes
-		"15:04:05",    // 24-hour clock with seconds
-		"03:04 PM",    // 12-hour clock with AM/PM
-		"03:04:05 PM", // 12-hour clock with seconds and AM/PM
-	}
+    // If the time string is already in 24-hour format, validate it
+    if is24HourFormat(timeStr) {
+        // Additional validation for 24-hour format
+        parts := strings.Split(timeStr, ":")
+        hours, err := strconv.Atoi(parts[0])
+        if err != nil || hours < 0 || hours > 23 {
+            return "", fmt.Errorf("invalid hours in 24-hour format: %s", parts[0])
+        }
+        minutes, err := strconv.Atoi(parts[1])
+        if err != nil || minutes < 0 || minutes > 59 {
+            return "", fmt.Errorf("invalid minutes in 24-hour format: %s", parts[1])
+        }
+        return timeStr, nil
+    }
+
+    // Define possible time formats
+    formats := []string{
+        "15:04",       // 24-hour clock with minutes
+        "15:04:05",    // 24-hour clock with seconds
+        "3:04 PM",     // 12-hour clock with AM/PM
+        "3:04:05 PM",  // 12-hour clock with seconds and AM/PM
+        "03:04 PM",    // 12-hour clock with leading zero
+        "03:04:05 PM", // 12-hour clock with seconds and leading zero
+    }
+
 	var parsedTime time.Time
 	var err error
+
+	// Clean the input time string
+    timeStr = strings.TrimSpace(timeStr)
+    timeStr = strings.ToUpper(timeStr) // Standardize AM/PM
+
 	// Try parsing with each format
-	for _, format := range formats {
-		if parsedTime, err = time.Parse(format, timeStr); err == nil {
-			break
-		}
-	}
-	// parsed timeStr not a valid timeString.
-	if err != nil {
-		return "", fmt.Errorf("error parsing time %s: %v", timeStr, err)
-	}
-	// Format time to 24-hour clock format
-	return parsedTime.Format("15:04"), nil
+    for _, format := range formats {
+        if parsedTime, err = time.Parse(format, timeStr); err == nil {
+            // Verify the parsed time components are valid
+            hours, minutes := parsedTime.Hour(), parsedTime.Minute()
+            
+            if hours < 0 || hours > 23 {
+                continue // Try next format
+            }
+            if minutes < 0 || minutes > 59 {
+                continue // Try next format
+            }
+            
+            // Return in 24-hour format
+            return parsedTime.Format("15:04"), nil
+        }
+    }
+
+    return "", fmt.Errorf("unable to parse time: %s", timeStr)
 }
 
 // Clean item descriptions by trimming and reducing multiple spaces
