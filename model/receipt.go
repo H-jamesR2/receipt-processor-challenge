@@ -156,10 +156,67 @@ func validateDate(dateStr string) error {
 		if matched, _ := regexp.MatchString(`^\d{4}-\d{2}-\d{2}$`, dateStr); !matched {
 			return errors.New("error: date format must be YYYY-MM-DD")
 		} */
-	if _, err := time.Parse("2006-01-02", dateStr); err != nil {
-		return errors.New("error processing receipt, invalid purchase date: date " + dateStr + " is invalid")
-	}
-	return nil
+	// Check for empty date
+    if dateStr == "" {
+        return errors.New("date cannot be empty")
+    }
+
+	// Handle different date formats
+    parts := []string{}
+    if strings.Contains(dateStr, "/") {
+        parts = strings.Split(dateStr, "/")
+    } else if strings.Contains(dateStr, "-") {
+        parts = strings.Split(dateStr, "-")
+    }
+
+	if len(parts) == 3 {
+        var month, day int
+        var err error
+        
+        // Try to parse the first two components as numbers
+        if len(parts[0]) <= 2 { // MM/DD format
+            month, err = strconv.Atoi(parts[0])
+            if err != nil {
+                return fmt.Errorf("invalid month format: %s", parts[0])
+            }
+            day, err = strconv.Atoi(parts[1])
+            if err != nil {
+                return fmt.Errorf("invalid day format: %s", parts[1])
+            }
+        } else { // YYYY-MM format
+            month, err = strconv.Atoi(parts[1])
+            if err != nil {
+                return fmt.Errorf("invalid month format: %s", parts[1])
+            }
+            day, err = strconv.Atoi(parts[2])
+            if err != nil {
+                return fmt.Errorf("invalid day format: %s", parts[2])
+            }
+        }
+
+        // Validate month and day ranges
+        if month < 1 || month > 12 {
+            return fmt.Errorf("invalid month: %d (must be between 1 and 12)", month)
+        }
+        if day < 1 || day > 31 {
+            return fmt.Errorf("invalid day: %d (must be between 1 and 31)", day)
+        }
+
+        // Additional validation for months with less than 31 days
+        if day == 31 && (month == 4 || month == 6 || month == 9 || month == 11) {
+            return fmt.Errorf("invalid day: month %d has only 30 days", month)
+        }
+        // Special case for February
+        if month == 2 {
+            if day > 29 {
+                return fmt.Errorf("invalid day: February cannot have more than 29 days")
+            }
+        }
+    } else {
+        return errors.New("invalid date format: must be YYYY-MM-DD, MM/DD/YYYY, or DD/MM/YYYY")
+    }
+
+    return nil
 }
 func validateTime(timeStr string) error {
 	// No need to match if Valid, just convert

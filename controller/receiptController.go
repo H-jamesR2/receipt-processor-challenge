@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"strconv"
 )
 
 // GET MethodS
@@ -52,12 +53,21 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 
 	// run trimming operation for itemShortDescriptions...
 	cleanItemShortDescriptions(&receipt)
-	// reformat Date if needed.
-	if formattedDate, err := parseAndFormatDate(receipt.PurchaseDate); err == nil {
-		receipt.PurchaseDate = formattedDate
-	} else {
-		fmt.Println(err)
-	}
+
+	    // Validate receipt before any processing
+    if err := receipt.ValidateReceipt(); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Format date only if validation passed
+    formattedDate, err := parseAndFormatDate(receipt.PurchaseDate)
+    if err != nil {
+        http.Error(w, fmt.Sprintf("Date formatting error: %v", err), http.StatusBadRequest)
+        return
+    }
+    receipt.PurchaseDate = formattedDate
+	
 	// reformat Time if needed.
 	if formattedTime, err := parseAndFormatTime(receipt.PurchaseTime); err == nil {
 		receipt.PurchaseTime = formattedTime
@@ -120,36 +130,56 @@ func isISODateFormat(dateStr string) bool {
 	re := regexp.MustCompile(`^([0-9]{4})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$`)
 	return re.MatchString(dateStr)
 }
+
 func parseAndFormatDate(dateStr string) (string, error) {
-	// If the date string is already in YYYY-MM-DD format, return it directly
-	if isISODateFormat(dateStr) {
-		return dateStr, nil
-	}
-	// Define possible date formats
-	formats := []string{
-		"01/02/2006",   // MM/DD/YYYY
-		"02/01/2006",   // DD/MM/YYYY
-		"2006-01-02",   // YYYY-MM-DD
-		"2006/01/02",   // YYYY/MM/DD
-		"Jan 2, 2006",  // Jan 2, 2006
-		"02-Jan-2006",  // 02-Jan-2006
-	}
-	var parsedDate time.Time
-	var err error
-	var dateLayout = "2006-01-02"
+    if isISODateFormat(dateStr) {
+        // Even if it's ISO format, validate the components
+        parts := strings.Split(dateStr, "-")
+        month, _ := strconv.Atoi(parts[1])
+        day, _ := strconv.Atoi(parts[2])
+        if month < 1 || month > 12 || day < 1 || day > 31 {
+            return "", fmt.Errorf("invalid date components in ISO format: month=%d, day=%d", month, day)
+        }
+        return dateStr, nil
+    }
 
-	// Try parsing with each format
-	for _, format := range formats {
-		if parsedDate, err = time.Parse(format, dateStr); err == nil {
-			
+    formats := []string{
+        "01/02/2006",   // MM/DD/YYYY
+        "02/01/2006",   // DD/MM/YYYY
+        "2006/01/02",   // YYYY/MM/DD
+        "Jan 2, 2006",  // Jan 2, 2006
+        "02-Jan-2006",  // 02-Jan-2006
+    }
 
-			// Successfully parsed the date
-			return parsedDate.Format(dateLayout), nil
-		}
-	}
+    var parsedDate time.Time
+    var err error
+    dateLayout := "2006-01-02"
 
-	return "", fmt.Errorf("error parsing date %s: %v", dateStr, err)
+    for _, format := range formats {
+        if parsedDate, err = time.Parse(format, dateStr); err == nil {
+            // Verify the parsed date components are valid
+            month := int(parsedDate.Month())
+            day := parsedDate.Day()
+            
+            if month < 1 || month > 12 || day < 1 || day > 31 {
+                continue // Try next format
+            }
+            
+            // Additional validation for specific months
+            if day == 31 && (month == 4 || month == 6 || month == 9 || month == 11) {
+                continue // This format produced an invalid date
+            }
+            if month == 2 && day > 29 {
+                continue // Invalid February date
+            }
+            
+            return parsedDate.Format(dateLayout), nil
+        }
+    }
+
+    return "", fmt.Errorf("unable to parse date: %s", dateStr)
 }
+
 // Time Functions
 func is24HourFormat(timeStr string) bool {
 	// Regular expression to check if the time string is in HH:MM format
