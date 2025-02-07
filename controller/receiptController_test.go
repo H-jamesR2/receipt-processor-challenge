@@ -7,8 +7,6 @@ import (
     "net/http/httptest"
     "testing"
     "receipt-processor-challenge/model"
-	"io/ioutil" // Add this for reading response body
-    "fmt" // Add this for debugging
 )
 
 // Test Helpers
@@ -29,6 +27,7 @@ func createTestReceipt() model.Receipt {
 }
 
 // Unit Tests
+/*
 func TestProcessReceipt_ValidInput(t *testing.T) {
     // Create test receipt
     receipt := createTestReceipt()
@@ -122,6 +121,37 @@ func TestProcessReceipt_InvalidInput(t *testing.T) {
             }
         })
     }
+} */
+func TestProcessReceipt(t *testing.T) {
+    testData := GetReceiptTestData() // Only get receipt test data
+
+    for _, tc := range testData.Valid {
+        t.Run(tc.Name, func(t *testing.T) {
+            req := httptest.NewRequest("POST", "/receipts/process", bytes.NewBufferString(tc.Input))
+            req.Header.Set("Content-Type", "application/json")
+            rr := httptest.NewRecorder()
+
+            ProcessReceipt(rr, req)
+
+            if rr.Code != tc.StatusCode {
+                t.Errorf("Expected status code %d, got %d", tc.StatusCode, rr.Code)
+            }
+        })
+    }
+
+    for _, tc := range testData.Invalid {
+        t.Run(tc.Name, func(t *testing.T) {
+            req := httptest.NewRequest("POST", "/receipts/process", bytes.NewBufferString(tc.Input))
+            req.Header.Set("Content-Type", "application/json")
+            rr := httptest.NewRecorder()
+
+            ProcessReceipt(rr, req)
+
+            if rr.Code != tc.StatusCode {
+                t.Errorf("Expected status code %d, got %d", tc.StatusCode, rr.Code)
+            }
+        })
+    }
 }
 
 func TestGetReceipt(t *testing.T) {
@@ -186,5 +216,54 @@ func TestReceiptValidation(t *testing.T) {
     err := receipt.ValidateReceipt()
     if err != nil {
         t.Errorf("Receipt validation failed: %v", err)
+    }
+}
+
+func TestParseAndFormatDate(t *testing.T) {
+    testData := GetDateTestData() // Only get date test data
+
+    for _, tc := range testData.Valid {
+        t.Run(tc.Name, func(t *testing.T) {
+            result, err := parseAndFormatDate(tc.Input)
+            if err != nil {
+                t.Errorf("Expected no error for valid date %s, got error: %v", tc.Input, err)
+            }
+            if result != tc.Expected {
+                t.Errorf("Expected formatted date %s, got %s", tc.Expected, result)
+            }
+        })
+    }
+
+    for _, tc := range testData.Invalid {
+        t.Run(tc.Name, func(t *testing.T) {
+            _, err := parseAndFormatDate(tc.Input)
+            if err == nil {
+                t.Errorf("Expected error for invalid date %s, got none", tc.Input)
+            }
+        })
+    }
+}
+func TestParseAndFormatTime(t *testing.T) {
+    testData := GetTimeTestData() // Only get time test data
+
+    for _, tc := range testData.Valid {
+        t.Run(tc.Name, func(t *testing.T) {
+            result, err := parseAndFormatTime(tc.Input)
+            if err != nil {
+                t.Errorf("Expected no error for valid time %s, got error: %v", tc.Input, err)
+            }
+            if result != tc.Expected {
+                t.Errorf("Expected formatted time %s, got %s", tc.Expected, result)
+            }
+        })
+    }
+
+    for _, tc := range testData.Invalid {
+        t.Run(tc.Name, func(t *testing.T) {
+            _, err := parseAndFormatTime(tc.Input)
+            if err == nil {
+                t.Errorf("Expected error for invalid time %s, got none", tc.Input)
+            }
+        })
     }
 }
