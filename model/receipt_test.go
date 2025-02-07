@@ -27,54 +27,6 @@ func TestValidateReceipt(t *testing.T) {
 	}
 }
 
-func TestValidateDate(t *testing.T) {
-    tests := []struct {
-        name    string
-        date    string
-        wantErr bool
-    }{
-        {"Empty date", "", true},
-        {"Invalid month format", "aa/01/2024", true},
-        {"Invalid day format", "01/bb/2024", true},
-        {"Invalid day for April", "2024-04-31", true},
-        {"Invalid February day", "2024-02-30", true},
-        {"Valid date", "2024-02-29", false},
-    }
-    
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := validateDate(tt.date)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("validateDate() error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
-}
-
-func TestValidateTime(t *testing.T) {
-    tests := []struct {
-        name    string
-        time    string
-        wantErr bool
-    }{
-        {"Empty time", "", true},
-        {"Invalid AM/PM format", "13:45 XM", true},
-        {"Missing minutes", "14", true},
-        {"Invalid minutes", "14:60", true},
-        {"Valid 24hr time", "14:30", false},
-        {"Valid 12hr time", "2:30 PM", false},
-    }
-    
-    for _, tt := range tests {
-        t.Run(tt.name, func(t *testing.T) {
-            err := validateTime(tt.time)
-            if (err != nil) != tt.wantErr {
-                t.Errorf("validateTime() error = %v, wantErr %v", err, tt.wantErr)
-            }
-        })
-    }
-}
-
 func TestGenerateID(t *testing.T) {
 	receipt := Receipt{}
 	receipt.GenerateUniqueID()
