@@ -12,6 +12,7 @@ Data does not need to persist when your application stops. It is sufficient to s
 2. [API-Specs-Summary](#Summary-of-API-Specification)
 3. [Running-the-Server](#Running-the-Server)
 4. [Testing-the-API](#Testing-the-API)
+5. [Running-Unit-Tests](#running-unit-tests)
 
 ## Language Selection
 
@@ -264,3 +265,36 @@ curl http://localhost:8080/receipts/RECEIPT_ID/points
 ```sh
 curl http://localhost:8080/rcpt
 ```
+
+## Running-Unit-Tests
+#### Requirements:
+- go installed
+- docker installed
+
+### Running Tests Locally in model
+
+
+
+To run unit tests, follow these steps:
+1. **Navigate to the `model` Directory**:
+   Change into the `model` directory where the test files are located:
+   - Note: that we only wrote unit tests for model/receipt.
+
+   ```sh
+   cd model
+   ```
+
+2. **Run the Tests**:
+   Use the following command to run the tests:
+
+   ```sh
+   go test -v ./...
+   ```
+
+3. **Check Coverage**:
+   To check the test coverage, run:
+
+   ```sh
+   go test -coverprofile=coverage.out
+   go tool cover -html=coverage.out
+   ```
