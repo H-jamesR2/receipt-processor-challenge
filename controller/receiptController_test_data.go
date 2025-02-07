@@ -1,6 +1,10 @@
 // controller/receiptController_test_data.go
 package controller
 
+import (
+    "net/http"
+)
+
 // Struct definitions remain the same
 type DateTestData struct {
     Valid   []DateTestCase
@@ -15,6 +19,15 @@ type TimeTestData struct {
 type ReceiptTestData struct {
     Valid   []ReceiptTestCase
     Invalid []ReceiptTestCase
+}
+
+type GetterReceiptTestData struct {
+    Valid   []GetterReceiptTestCase
+    Invalid []GetterReceiptTestCase
+}
+
+type NotFoundTestData struct {
+    Cases []NotFoundTestCase // NotFound cases are all "invalid" by nature
 }
 
 type DateTestCase struct {
@@ -36,6 +49,21 @@ type ReceiptTestCase struct {
     Input       string
     StatusCode  int
     Response    string
+}
+
+type NotFoundTestCase struct {
+    Name           string
+    Path           string
+    ExpectedStatus int
+    ExpectedError  string
+}
+
+type GetterReceiptTestCase struct {
+    Name           string
+    Path           string
+    SetupReceipt   bool        // Whether to setup a test receipt
+    ExpectedStatus int
+    ExpectedBody   string      // Expected response body or error message
 }
 
 // Separate functions for different test data sets
@@ -182,6 +210,75 @@ func GetReceiptTestData() ReceiptTestData {
                 Input: `{invalid json}`,
                 StatusCode: 400,
                 Response:   "Invalid JSON format",
+            },
+        },
+    }
+}
+
+func GetNotFoundTestData() NotFoundTestData {
+    return NotFoundTestData{
+        Cases: []NotFoundTestCase{
+            {
+                Name:           "Non-existent Path",
+                Path:           "/invalid/path",
+                ExpectedStatus: http.StatusNotFound,
+                ExpectedError:  "Endpoint not found",
+            },
+            {
+                Name:           "Invalid Receipts Path",
+                Path:           "/receipts/invalid/path",
+                ExpectedStatus: http.StatusNotFound,
+                ExpectedError:  "Endpoint not found",
+            },
+            {
+                Name:           "Empty Path",
+                Path:           "/",
+                ExpectedStatus: http.StatusNotFound,
+                ExpectedError:  "Endpoint not found",
+            },
+        },
+    }
+}
+
+func GetGetterReceiptTestData() GetterReceiptTestData {
+    return GetterReceiptTestData{
+        Valid: []GetterReceiptTestCase{
+            {
+                Name:           "Get All Receipts",
+                Path:           "/receipts/",
+                SetupReceipt:   true,
+                ExpectedStatus: http.StatusOK,
+                ExpectedBody:   "", // Will be validated separately as it's a list
+            },
+            {
+                Name:           "Get Specific Receipt",
+                Path:           "/receipts/%s", // %s will be replaced with actual ID
+                SetupReceipt:   true,
+                ExpectedStatus: http.StatusOK,
+                ExpectedBody:   "", // Will be validated separately as it's a receipt object
+            },
+            {
+                Name:           "Get Receipt Points",
+                Path:           "/receipts/%s/points", // %s will be replaced with actual ID
+                SetupReceipt:   true,
+                ExpectedStatus: http.StatusOK,
+                ExpectedBody:   "", // Will be validated separately as it's a points object
+            },
+        },
+        Invalid: []GetterReceiptTestCase{
+            {
+                Name:           "Get Non-existent Receipt",
+                Path:           "/receipts/nonexistent-id",
+                SetupReceipt:   false,
+                ExpectedStatus: http.StatusNotFound,
+                ExpectedBody:   "Receipt not found",
+            },
+            {
+                Name:           "Get Points for Non-existent Receipt",
+                Path:           "/receipts/nonexistent-id/points",
+                SetupReceipt:   false,
+                ExpectedStatus: http.StatusNotFound,
+                ExpectedBody:   "Receipt not found",
             },
         },
     }

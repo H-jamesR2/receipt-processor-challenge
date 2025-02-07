@@ -1,12 +1,14 @@
 package controller
 
 import (
-    "bytes"
-    "encoding/json"
-    "net/http"
-    "net/http/httptest"
-    "testing"
-    "receipt-processor-challenge/model"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"receipt-processor-challenge/model"
+	"strings"
+	"testing"
 )
 
 // Test Helpers
@@ -154,6 +156,7 @@ func TestProcessReceipt(t *testing.T) {
     }
 }
 
+/*
 func TestGetReceipt(t *testing.T) {
     // First create a receipt
     receipt := createTestReceipt()
@@ -179,6 +182,96 @@ func TestGetReceipt(t *testing.T) {
     }
     if response.ID != receipt.ID {
         t.Errorf("Expected receipt ID %v, got %v", receipt.ID, response.ID)
+    }
+} */
+ func TestGetReceipt_Comprehensive(t *testing.T) {
+    testData := GetGetterReceiptTestData()
+
+    // Test valid cases
+    for _, tc := range testData.Valid {
+        t.Run(tc.Name, func(t *testing.T) {
+            // Setup
+            model.ClearReceipts()
+            var receiptID string
+            if tc.SetupReceipt {
+                receipt := createTestReceipt()
+                receipt.GenerateUniqueID()
+                receipt.CalculatePoints()
+                model.AddReceipt(receipt)
+                receiptID = receipt.ID
+            }
+
+            // Format path if needed
+            path := tc.Path
+            if strings.Contains(path, "%s") {
+                path = fmt.Sprintf(tc.Path, receiptID)
+            }
+
+            // Create and execute request
+            req := httptest.NewRequest("GET", path, nil)
+            rr := httptest.NewRecorder()
+
+            GetReceipt(rr, req)
+
+            // Check status code
+            if status := rr.Code; status != tc.ExpectedStatus {
+                t.Errorf("handler returned wrong status code: got %v want %v",
+                    status, tc.ExpectedStatus)
+            }
+
+            // Validate response based on the type of request
+            switch {
+            case strings.HasSuffix(path, "/points"):
+                var response struct {
+                    Points uint `json:"points"`
+                }
+                if err := json.NewDecoder(rr.Body).Decode(&response); err != nil {
+                    t.Fatalf("Failed to decode points response: %v", err)
+                }
+            case strings.HasSuffix(path, "/"):
+                var receipts []model.Receipt
+                if err := json.NewDecoder(rr.Body).Decode(&receipts); err != nil {
+                    t.Fatalf("Failed to decode receipts list: %v", err)
+                }
+                if tc.SetupReceipt && len(receipts) != 1 {
+                    t.Errorf("Expected 1 receipt, got %d", len(receipts))
+                }
+            default:
+                var receipt model.Receipt
+                if err := json.NewDecoder(rr.Body).Decode(&receipt); err != nil {
+                    t.Fatalf("Failed to decode receipt: %v", err)
+                }
+                if receipt.ID != receiptID {
+                    t.Errorf("Expected receipt ID %s, got %s", receiptID, receipt.ID)
+                }
+            }
+        })
+    }
+
+    // Test invalid cases
+    for _, tc := range testData.Invalid {
+        t.Run(tc.Name, func(t *testing.T) {
+            // Setup
+            model.ClearReceipts()
+            
+            // Create and execute request
+            req := httptest.NewRequest("GET", tc.Path, nil)
+            rr := httptest.NewRecorder()
+
+            GetReceipt(rr, req)
+
+            // Check status code
+            if status := rr.Code; status != tc.ExpectedStatus {
+                t.Errorf("handler returned wrong status code: got %v want %v",
+                    status, tc.ExpectedStatus)
+            }
+
+            // Check error message
+            if !strings.Contains(rr.Body.String(), tc.ExpectedBody) {
+                t.Errorf("Expected response to contain '%s', got '%s'", 
+                    tc.ExpectedBody, rr.Body.String())
+            }
+        })
     }
 }
 
@@ -263,6 +356,41 @@ func TestParseAndFormatTime(t *testing.T) {
             _, err := parseAndFormatTime(tc.Input)
             if err == nil {
                 t.Errorf("Expected error for invalid time %s, got none", tc.Input)
+            }
+        })
+    }
+}
+
+func TestNotFoundHandler(t *testing.T) {
+    testData := GetNotFoundTestData()
+
+    for _, tc := range testData.Cases {
+        t.Run(tc.Name, func(t *testing.T) {
+            req := httptest.NewRequest("GET", tc.Path, nil)
+            rr := httptest.NewRecorder()
+
+            NotFoundHandler(rr, req)
+
+            if status := rr.Code; status != tc.ExpectedStatus {
+                t.Errorf("handler returned wrong status code: got %v want %v",
+                    status, tc.ExpectedStatus)
+            }
+
+            var response map[string]string
+            err := json.NewDecoder(rr.Body).Decode(&response)
+            if err != nil {
+                t.Fatalf("Failed to decode response body: %v", err)
+            }
+
+            if response["error"] != tc.ExpectedError {
+                t.Errorf("handler returned unexpected error: got %v want %v",
+                    response["error"], tc.ExpectedError)
+            }
+
+            expectedMessage := fmt.Sprintf("The requested URL %s was not found on this server.", tc.Path)
+            if response["message"] != expectedMessage {
+                t.Errorf("handler returned unexpected message: got %v want %v",
+                    response["message"], expectedMessage)
             }
         })
     }

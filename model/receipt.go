@@ -144,6 +144,11 @@ func GetAllReceipts() []Receipt {
 	}
 	return receiptsList
 }
+
+func ClearReceipts() {
+    receipts = make(map[string]Receipt)
+}
+
 // Helper Functions:
 
 /* 
