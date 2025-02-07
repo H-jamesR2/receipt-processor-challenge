@@ -276,9 +276,10 @@ curl http://localhost:8080/rcpt
 
 
 To run unit tests, follow these steps:
-1. **Navigate to the `model` Directory**:
-   Change into the `model` directory where the test files are located:
-   - Note: that we only wrote unit tests for model/receipt.
+1. **Navigate to `model` OR `controller` Directory**:
+   Change into the directory where the test files are located:
+   - Note: that we only wrote unit tests for:
+   - model/receipt, controller/receiptController
 
    ```sh
    cd model
