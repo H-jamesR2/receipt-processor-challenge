@@ -66,6 +66,7 @@ type GetterReceiptTestCase struct {
     ExpectedBody   string      // Expected response body or error message
 }
 
+/*
 // Separate functions for different test data sets
 func GetDateTestData() DateTestData {
     return DateTestData{
@@ -172,7 +173,7 @@ func GetTimeTestData() TimeTestData {
             },
         },
     }
-}
+} */
 
 func GetReceiptTestData() ReceiptTestData {
     return ReceiptTestData{

@@ -1,14 +1,16 @@
 // controller/receiptController.go
 package controller
+
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"receipt-processor-challenge/config"
 	"receipt-processor-challenge/model"
 	"regexp"
+	//"strconv"
 	"strings"
-	"time"
-	"strconv"
+	//"time"
 )
 
 // GET MethodS
@@ -60,16 +62,16 @@ func ProcessReceipt(w http.ResponseWriter, r *http.Request) {
 	// run trimming operation for itemShortDescriptions...
 	cleanItemShortDescriptions(&receipt)
 
-    // Format date only if validation passed
-    formattedDate, err := parseAndFormatDate(receipt.PurchaseDate)
+    // Format date using consolidated utility
+    formattedDate, err := config.ValidateAndFormatDate(receipt.PurchaseDate)
     if err != nil {
         http.Error(w, fmt.Sprintf("Date formatting error: %v", err), http.StatusBadRequest)
         return
     }
     receipt.PurchaseDate = formattedDate
-	
-    // Format time only if validation passed
-    formattedTime, err := parseAndFormatTime(receipt.PurchaseTime)
+
+    // Format time using consolidated utility
+    formattedTime, err := config.ValidateAndFormatTime(receipt.PurchaseTime)
     if err != nil {
         http.Error(w, fmt.Sprintf("Time formatting error: %v", err), http.StatusBadRequest)
         return
@@ -125,6 +127,7 @@ func NotFoundHandler(w http.ResponseWriter, r *http.Request) {
 /*
 	Helper Functions
 */
+/*
 // Date Functions
 func isISODateFormat(dateStr string) bool {
 	// Regular expression to check if the date string is in YYYY-MM-DD format
@@ -134,12 +137,9 @@ func isISODateFormat(dateStr string) bool {
 
 func parseAndFormatDate(dateStr string) (string, error) {
     if isISODateFormat(dateStr) {
-        // Even if it's ISO format, validate the components
-        parts := strings.Split(dateStr, "-")
-        month, _ := strconv.Atoi(parts[1])
-        day, _ := strconv.Atoi(parts[2])
-        if month < 1 || month > 12 || day < 1 || day > 31 {
-            return "", fmt.Errorf("invalid date components in ISO format: month=%d, day=%d", month, day)
+        // Validate the date components even in ISO format
+        if !isValidDate(dateStr) {
+            return "", fmt.Errorf("invalid date components: %s", dateStr)
         }
         return dateStr, nil
     }
@@ -158,27 +158,63 @@ func parseAndFormatDate(dateStr string) (string, error) {
 
     for _, format := range formats {
         if parsedDate, err = time.Parse(format, dateStr); err == nil {
-            // Verify the parsed date components are valid
-            month := int(parsedDate.Month())
-            day := parsedDate.Day()
+            // Convert to ISO format string
+            isoDate := parsedDate.Format(dateLayout)
             
-            if month < 1 || month > 12 || day < 1 || day > 31 {
-                continue // Try next format
+            // Validate the resulting date
+            if !isValidDate(isoDate) {
+                continue // Try next format if date is invalid
+            }
+
+            // For DD/MM/YYYY format, we need special handling
+            if format == "02/01/2006" {
+                // Split the input string and verify the day/month order
+                parts := strings.Split(dateStr, "/")
+                if len(parts) == 3 {
+                    day, _ := strconv.Atoi(parts[0])
+                    month, _ := strconv.Atoi(parts[1])
+                    // If the input was meant to be DD/MM/YYYY, swap the values
+                    return fmt.Sprintf("%s-%02d-%02d", parts[2], month, day), nil
+                }
             }
             
-            // Additional validation for specific months
-            if day == 31 && (month == 4 || month == 6 || month == 9 || month == 11) {
-                continue // This format produced an invalid date
-            }
-            if month == 2 && day > 29 {
-                continue // Invalid February date
-            }
-            
-            return parsedDate.Format(dateLayout), nil
+            return isoDate, nil
         }
     }
 
     return "", fmt.Errorf("unable to parse date: %s", dateStr)
+}
+
+// Helper function to validate date components
+func isValidDate(dateStr string) bool {
+    parts := strings.Split(dateStr, "-")
+    if len(parts) != 3 {
+        return false
+    }
+
+    year, _ := strconv.Atoi(parts[0])
+    month, _ := strconv.Atoi(parts[1])
+    day, _ := strconv.Atoi(parts[2])
+
+    // Basic range checks
+    if month < 1 || month > 12 || day < 1 || day > 31 {
+        return false
+    }
+
+    // Check days in month
+    daysInMonth := 31
+    if month == 4 || month == 6 || month == 9 || month == 11 {
+        daysInMonth = 30
+    } else if month == 2 {
+        // February special case
+        if year%4 == 0 && (year%100 != 0 || year%400 == 0) {
+            daysInMonth = 29
+        } else {
+            daysInMonth = 28
+        }
+    }
+
+    return day <= daysInMonth
 }
 
 // Time Functions
@@ -241,6 +277,7 @@ func parseAndFormatTime(timeStr string) (string, error) {
 
     return "", fmt.Errorf("unable to parse time: %s", timeStr)
 }
+*/
 
 // Clean item descriptions by trimming and reducing multiple spaces
 func cleanItemShortDescriptions(receipt *model.Receipt) {
